@@ -8,21 +8,33 @@
 struct Processes {
 
     pid_t PID;
-    BOOL status;
+    int status;
     char Pname[1000];
     time_t start_time;
     time_t end_time;
-    time_t elapsed_time = 0;
+    int elapsed_time;
 };
 
 
 
 int main () {
-   struct Processes process_list[512];
+   struct Processes process_list[1];
+   int size = sizeof(process_list) / sizeof(process_list[0]);
    char cd[8] = "maaz:~$ ";
    char error[1000];
    int i = 0;
    int pid = -1;
+   
+   for (int j = 0; j < size; j++)
+   {
+       process_list[j].PID = 0;
+       process_list[j].status = 0;
+       strcpy(process_list[j].Pname, "");
+       process_list[j].start_time = NULL;
+       process_list[j].end_time = NULL;
+       process_list[j].elapsed_time = 0;
+   }
+
    while (1)
    {
         int a = write(STDOUT_FILENO, cd, sizeof(cd));
@@ -150,30 +162,32 @@ int main () {
                     write(STDOUT_FILENO, "Invalid arguments for run\n", sizeof("Invalid arguments for run\n"));
                 }
                 else{
-                    char *path[1000];
+                    char args[1000] = "";
 
-                    char *arr[1000];
-                    char *sl = strtok(command, "/");
-                    int i = 0;
+                   // char *arr[1000];
+                    //char *sl = strtok(command, "/");
+                    
 
 
                     char *com = c;
+                    c = strtok(NULL, " ");
                     while (c != NULL)
                     {
-                        strcat(path, c);
-                        strcat(path, " ");
+
+                        strcat(args, c);
+                        strcat(args, " ");
                         c = strtok(NULL, " ");
                     }
 
 
 
-                    char *argv[3] = {com,c, NULL};
+                    char *argv[3] = {com,args, NULL};
                     pid = fork();
 
                     if (pid == 0)
                     {
-                        int i = execvp(com, argv);
-                        if (i < 0)
+                        int a = execvp(com, argv);
+                        if (a < 0)
                         {
                             int p = execv(com, argv);
                             if (p < 0)
@@ -186,11 +200,14 @@ int main () {
                                 time (&raw_time);
                                 timeinfo = localtime(&raw_time);
                                 process_list[i].PID = getpid();
+                                //printf("%d\n", getpid());
+                                //write(STDOUT_FILENO, "ERROR: Not enough arguments\n", sizeof("ERROR: Not enough arguments\n"))
                                 strcpy(process_list[i].Pname, com);
-                                process_list[i].status = TRUE;
+                                process_list[i].status = 1;
                                 process_list[i].start_time = time(NULL);
                                 process_list[i].end_time = NULL;
                                 process_list[i].elapsed_time = 0;
+                                i++;
 
                             }
 
@@ -201,37 +218,50 @@ int main () {
                             time (&raw_time);
                             timeinfo = localtime(&raw_time);
                             process_list[i].PID = getpid();
+                            //printf("%d\n", getpid());
                             strcpy(process_list[i].Pname, com);
-                            process_list[i].status = TRUE;
+                            process_list[i].status = 1;
                             process_list[i].start_time = time(NULL);
                             process_list[i].end_time = NULL;
                             process_list[i].elapsed_time = 0;
+                            i++;
 
                         }
                     }
 
-                    wait(2);
+                    //wait(2);
                 }
 
             }
            else if (strcmp(c, "list") == 0){
 
-                    for (int j = 0; j < sizeof(process_list); j++)
+                    for (int j = 0; j < size; j++)
                     {
-                        if (process_list[j].PID != 0){
-                            printf("Process ID: %d\n", process_list[j].PID);
-                            printf("Process Name: %s\n", process_list[j].Pname);
-                            printf("Status: %d\n", process_list[j].status);
-                            printf("Start Time: %s", asctime(localtime(&process_list[j].start_time)));
+                        //if (process_list[j].PID != 0){
+                            char buff1[10000];
+                            int a = sprintf(buff1, "Process ID: %d\n", process_list[j].PID);
+                            write(STDOUT_FILENO, buff1, a);
+                            int b = sprintf(buff1, "Process Name: %s\n", process_list[j].Pname);
+                            write(STDOUT_FILENO, buff1, b);
+                            int c = sprintf(buff1, "Status: %d\n", process_list[j].status);
+                            write(STDOUT_FILENO, buff1, c);
+                         
+                            int d = sprintf(buff1, "Start Time: %s", asctime(localtime(&process_list[j].start_time)));
+                            write(STDOUT_FILENO, buff1, d);
+            
                             if (process_list[j].status)
-                            printf("End Time: %s\n\n", asctime(process_list[j].end_time));
-                            else
-                            printf("End Time: %s\n\n", asctime(localtime(&process_list[j].end_time)));
-
-                        }
-                        else{
-                            break;
-                        }
+                            {
+                                int e = sprintf(buff1, "End Time: %s\n\n", asctime(process_list[j].end_time));
+                                write(STDOUT_FILENO, buff1, e);
+                            }
+                            else {
+                                int e = sprintf(buff1, "End Time: %s\n\n", asctime(localtime(&process_list[j].end_time)));
+                                write(STDOUT_FILENO, buff1, e);
+                            }
+                        //}
+                        //else{
+                        //    break;
+                        //}
                     }
 
             }
@@ -264,9 +294,9 @@ int main () {
                             int prodID2 = (int) process_list[j].PID;
                             if (prodID == prodID2 || strcmp(process_list[j].Pname, path) == 0)
                             {
-                                process_list[j].status = FALSE;
+                                process_list[j].status = 0;
                                 process_list[j].end_time = time(NULL);
-                                process_list[j].elapsed_time = process_list[j].end_time - process.list[j].start_time;
+                                process_list[j].elapsed_time = process_list[j].end_time - process_list[j].start_time;
                                 printf("Killed\n");
 
                                 exit(0);
