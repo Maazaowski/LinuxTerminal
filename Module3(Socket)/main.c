@@ -6,6 +6,10 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <signal.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+
 
 
 struct Processes {
@@ -18,44 +22,79 @@ struct Processes {
     int elapsed_time;
 };
 
-struct Processes process_list[100];
+
+
 int i = 0;
+pid_t tpid = 0;
+int status;
 
-void successfulProcess() {
-    i++;
-    char buf[1000];
-    sprintf(buf, "Process executed: %d\n", getpid());
-    write(STDOUT_FILENO, buf, 26);
-}
-
-void unsuccessfulProcess() {
-       char buf[1000];
-       sprintf(buf, "Process not executed: %d\n", process_list[i].PID);
-       write(STDOUT_FILENO, buf, 29);
-       process_list[i].PID = 0;
-       process_list[i].status = 0;
-       strcpy(process_list[i].Pname, "");
-       process_list[i].start_time = NULL;
-       process_list[i].end_time = NULL;
-       process_list[i].elapsed_time = 0;
-       
-       
-
+void child_terminated() {
+    waitpid(tpid, &status, 0);
 
 }
-
 
 
 int main () {
-   signal(SIGUSR1, unsuccessfulProcess);
-   signal(SIGUSR2, successfulProcess);
-  
-   int size = sizeof(process_list) / sizeof(process_list[0]);
-   char cd[8] = "maaz:~$ ";
-   char error[1000];
-   int pid = -1;
+
+   signal(SIGCHLD, child_terminated); 
+   //int length = 0;
+   int boole = 0;
+
+   int processpipe[2];
+
+   int ret = pipe(processpipe);
+
+   if (ret == -1)
+   {
+       perror("pipe");
+       exit(-1);
+   }
    
-   for (int j = 0; j < size; j++)
+  
+   int sock, length;
+   struct sockaddr_in server;
+   int msgsock;
+   char command[1024];
+   int rval;
+   int i;
+   char error[1000];
+   
+   int pid = -1;
+   sock = socket(AF_INET, SOCK_STREAM, 0);
+   if (sock < 0) {
+		perror("opening stream socket");
+		exit(1);
+   }
+
+   server.sin_family = AF_INET;
+	server.sin_addr.s_addr = INADDR_ANY;
+	server.sin_port = 0;
+	if (bind(sock, (struct sockaddr *) &server, sizeof(server))) {
+		perror("binding stream socket");
+		exit(1);
+	}
+
+    length = sizeof(server);
+	if (getsockname(sock, (struct sockaddr *) &server, (socklen_t*) &length)) {
+		perror("getting socket name");
+		exit(1);
+	}
+	printf("Socket has port #%d\n", ntohs(server.sin_port));
+	fflush(stdout);
+
+    listen(sock, 5);
+
+    do {
+		msgsock = accept(sock, 0, 0);
+		if (msgsock == -1)
+			perror("accept");
+		else do {
+            int pid = fork();
+            if (pid == 0)
+            {
+                struct Processes process_list[100];
+                int size = sizeof(process_list) / sizeof(process_list[0]);
+                   for (int j = 0; j < size; j++)
    {
        process_list[j].PID = 0;
        process_list[j].status = 0;
@@ -64,27 +103,15 @@ int main () {
        process_list[j].end_time = NULL;
        process_list[j].elapsed_time = 0;
    }
+			bzero(command, sizeof(command));
+			if ((rval = read(msgsock, command, sizeof(command))) < 0)
+				perror("reading stream message");
+			i = 0;
+			if (rval == 0)
+				printf("Ending connection\n");
+			else{
 
-   while (1)
-   {
-        int a = write(STDOUT_FILENO, cd, sizeof(cd));
-        if (a == -1)
-        {
-            perror("write");
-            exit(-1);
-        }
-        char command[100];
-        int c = read(STDIN_FILENO, command, sizeof(command));
-
-        if (c == -1)
-        {
-            perror("read");
-            exit(-1);
-        }
-
-        command[c-1] = '\0';
-
-        if (strcmp (command, "exit") == 0)
+            if (strcmp (command, "exit") == 0)
         {
             for (int j = 0; j < size; j++)
             {
@@ -367,7 +394,17 @@ int main () {
             }
         }
 
-    }
+
+            }
+
+
+
+				//printf("-->%s\n", command);
+		} }while (rval != 0);
+		close(msgsock);
+	} while (1);
+   
+
 
 
 }
