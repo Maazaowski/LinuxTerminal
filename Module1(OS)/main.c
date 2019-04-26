@@ -4,6 +4,9 @@
 #include <unistd.h>
 #include <time.h>
 #include <errno.h>
+#include <sys/types.h>
+#include <signal.h>
+
 
 struct Processes {
 
@@ -15,14 +18,38 @@ struct Processes {
     int elapsed_time;
 };
 
+struct Processes process_list[100];
+int i = 0;
+
+void successfulProcess() {
+    i++;
+    char buf[1000];
+    sprintf(buf, "Process executed: %d\n", getpid());
+    write(STDOUT_FILENO, buf, 26);
+}
+
+void unsuccessfulProcess() {
+
+       process_list[i].PID = 0;
+       process_list[i].status = 0;
+       strcpy(process_list[i].Pname, "");
+       process_list[i].start_time = NULL;
+       process_list[i].end_time = NULL;
+       process_list[i].elapsed_time = 0;
+       char buf[1000];
+       sprintf(buf, "Process not executed: %d\n", getpid());
+       write(STDOUT_FILENO, buf, 29);
+
+
+}
+
 
 
 int main () {
-   struct Processes process_list[1];
+  
    int size = sizeof(process_list) / sizeof(process_list[0]);
    char cd[8] = "maaz:~$ ";
    char error[1000];
-   int i = 0;
    int pid = -1;
    
    for (int j = 0; j < size; j++)
@@ -184,8 +211,26 @@ int main () {
                     char *argv[3] = {com,args, NULL};
                     pid = fork();
 
+                    if (pid > 0)
+                    {
+                        time_t raw_time;
+                        struct tm *timeinfo;
+                        time (&raw_time);
+                        timeinfo = localtime(&raw_time);
+                        process_list[i].PID = pid;
+                        //printf("%d\n", getpid());
+                        //write(STDOUT_FILENO, "ERROR: Not enough arguments\n", sizeof("ERROR: Not enough arguments\n"))
+                        strcpy(process_list[i].Pname, com);
+                        process_list[i].status = 1;
+                        process_list[i].start_time = time(NULL);
+                        process_list[i].end_time = NULL;
+                        process_list[i].elapsed_time = 0;
+                    }
+
                     if (pid == 0)
                     {
+                        signal(SIGUSR1, unsuccessfulProcess);
+                        signal(SIGUSR2, successfulProcess);
                         int a = execvp(com, argv);
                         if (a < 0)
                         {
@@ -193,38 +238,20 @@ int main () {
                             if (p < 0)
                             {
                                 perror("run");
+                                kill(getpid(), SIGUSR1);
                             }
                             else{
-                                time_t raw_time;
-                                struct tm *timeinfo;
-                                time (&raw_time);
-                                timeinfo = localtime(&raw_time);
-                                process_list[i].PID = getpid();
-                                //printf("%d\n", getpid());
-                                //write(STDOUT_FILENO, "ERROR: Not enough arguments\n", sizeof("ERROR: Not enough arguments\n"))
-                                strcpy(process_list[i].Pname, com);
-                                process_list[i].status = 1;
-                                process_list[i].start_time = time(NULL);
-                                process_list[i].end_time = NULL;
-                                process_list[i].elapsed_time = 0;
-                                i++;
+                                
+                                kill(getpid(), SIGUSR2);
+                                //i++;
 
                             }
 
                         }
                         else{
-                            time_t raw_time;
-                            struct tm *timeinfo;
-                            time (&raw_time);
-                            timeinfo = localtime(&raw_time);
-                            process_list[i].PID = getpid();
-                            //printf("%d\n", getpid());
-                            strcpy(process_list[i].Pname, com);
-                            process_list[i].status = 1;
-                            process_list[i].start_time = time(NULL);
-                            process_list[i].end_time = NULL;
-                            process_list[i].elapsed_time = 0;
-                            i++;
+                            
+                            kill(getpid(), SIGUSR2);
+                            //i++;
 
                         }
                     }
@@ -237,7 +264,7 @@ int main () {
 
                     for (int j = 0; j < size; j++)
                     {
-                        //if (process_list[j].PID != 0){
+                        if (process_list[j].PID != 0){
                             char buff1[10000];
                             int a = sprintf(buff1, "Process ID: %d\n", process_list[j].PID);
                             write(STDOUT_FILENO, buff1, a);
@@ -258,15 +285,15 @@ int main () {
                                 int e = sprintf(buff1, "End Time: %s\n\n", asctime(localtime(&process_list[j].end_time)));
                                 write(STDOUT_FILENO, buff1, e);
                             }
-                        //}
-                        //else{
-                        //    break;
-                        //}
+                        }
+                        else{
+                            break;
+                        }
                     }
 
             }
 
-            else if (strcmp(c, "kill") == 0 && pid == 0)
+            else if (strcmp(c, "kill") == 0)
             {
                 c = strtok(NULL, " ");
 
@@ -296,9 +323,10 @@ int main () {
                             {
                                 process_list[j].status = 0;
                                 process_list[j].end_time = time(NULL);
-                                process_list[j].elapsed_time = process_list[j].end_time - process_list[j].start_time;
+                                process_list[j].elapsed_time = (int) process_list[j].end_time - process_list[j].start_time;
                                 printf("Killed\n");
 
+                                kill(process_list[j].PID, SIGTERM);
                                 exit(0);
 
                                 break;
