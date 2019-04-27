@@ -10,6 +10,7 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <arpa/inet.h>
+#include <sys/wait.h>
 
 
 
@@ -31,39 +32,22 @@ struct Clients {
 
 };
 
-struct Processes process_list[100];
-struct Clients clients_list[100];
-int size = sizeof(process_list) / sizeof(process_list[0]);
-
 pid_t tpid = 0;
 int status;
 
 void child_terminated() {
     pid_t pid = wait(NULL);
-    write(STDOUT_FILENO, "SIGCHILD HANDLING", 17);
-    //printf("%d\n", pid);
+}
 
-    if (pid == -1)
-    {
-        perror("Child killing");
-    }
-    for (int j = 0; j < size; j++)
-    {
-        if (pid == process_list[j].PID)
-        {
-            //printf("true: %d\n", pid);
-            process_list[j].status = 0;
-            process_list[j].end_time = time(NULL);
-            process_list[j].elapsed_time = (int) process_list[j].end_time - process_list[j].start_time;
-            break;
-        }
-    }
+void terminalTermination() {
+    
+
 }
 
 
 int main () {
 
-    
+   struct Clients clients_list[100];
    //int length = 0;
    int clientno = 0;
    
@@ -151,13 +135,14 @@ int main () {
             {
                 perror("Elapsed write");
             }
-            write(STDOUT_FILENO, "--------------------------", sizeof("--------------------------"));
+            write(STDOUT_FILENO, "--------------------------\n", sizeof("--------------------------\n"));
         }
 
         int p = fork();
         if (p == 0)
         {
             signal(SIGCHLD, child_terminated);
+            signal(SIGINT, terminalTermination);
             int i = 0;
             int pid = -1;
             struct Processes process_list[100];
@@ -181,7 +166,23 @@ int main () {
                 write(STDOUT_FILENO, ip, ipc);
 				perror("reading stream message");
             }
-			
+
+			int killpid = waitpid(-1, NULL, WNOHANG);
+
+            if (killpid > 0)
+            {
+                for (int j = 0; j < size; j++)
+                {
+                    if (process_list[j].PID == killpid)
+                    {
+                        process_list[j].status = 0;
+                        process_list[j].end_time = time(NULL);
+                        process_list[j].elapsed_time = (int) process_list[j].end_time - process_list[j].start_time;
+                    }
+                }
+            }
+
+
 			if (rval == 0)
             {
                 write(STDOUT_FILENO, ip, ipc);
@@ -454,7 +455,10 @@ int main () {
                                     perror("kill");
                                 else{
                                     int killed = write(msgsock, "Killed\n", sizeof("Killed\n"));
-                                    if (killed > 0)
+                                    process_list[j].status = 0;
+                                    process_list[j].end_time = time(NULL);
+                                    process_list[j].elapsed_time = (int) process_list[j].end_time - process_list[j].start_time;
+                                    if (killed < 0)
                                     {
                                         perror("Killed write");
                                     }

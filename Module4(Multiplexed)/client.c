@@ -60,9 +60,7 @@ int main(int argc, char *argv[])
 	
 
 	while(1) {
-		FD_ZERO(&readfds);
-
-		FD_SET(sock, &readfds);
+		
 
 		timeout.tv_sec = 1;
 		timeout.tv_usec = 5;
@@ -96,6 +94,9 @@ int main(int argc, char *argv[])
 	int ret = -1;
 	while (ret != 0)
 	{
+			FD_ZERO(&readfds);
+
+			FD_SET(sock, &readfds);
 			ret = select(8, &readfds, NULL, NULL, &timeout);
 			if (ret != 0)
 			{

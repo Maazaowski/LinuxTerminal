@@ -10,6 +10,7 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <arpa/inet.h>
+#include <sys/wait.h>
 
 
 
@@ -31,39 +32,26 @@ struct Clients {
 
 };
 
-struct Processes process_list[100];
-struct Clients clients_list[100];
-int size = sizeof(process_list) / sizeof(process_list[0]);
-
 pid_t tpid = 0;
 int status;
 
 void child_terminated() {
-    pid_t pid = wait(NULL);
-    write(STDOUT_FILENO, "SIGCHILD HANDLING", 17);
-    //printf("%d\n", pid);
+    pid_t pid = waitpid(-1, NULL, WNOHANG);
+}
 
-    if (pid == -1)
-    {
-        perror("Child killing");
-    }
-    for (int j = 0; j < size; j++)
-    {
-        if (pid == process_list[j].PID)
-        {
-            //printf("true: %d\n", pid);
-            process_list[j].status = 0;
-            process_list[j].end_time = time(NULL);
-            process_list[j].elapsed_time = (int) process_list[j].end_time - process_list[j].start_time;
-            break;
-        }
-    }
+void terminalTermination() {
+    pid_t pid = waitpid(-1, NULL, WNOHANG);
+
+}
+
+void sigterm_handler() {
+    pid_t pid = waitpid(-1, NULL, WNOHANG);
 }
 
 
 int main () {
 
-    
+   struct Clients clients_list[100];
    //int length = 0;
    int clientno = 0;
    
@@ -93,7 +81,7 @@ int main () {
 		exit(1);
    }
 
-   server.sin_family = AF_INET;
+    server.sin_family = AF_INET;
 	server.sin_addr.s_addr = INADDR_ANY;
 	server.sin_port = 0;
 	if (bind(sock, (struct sockaddr *) &server, sizeof(server))) {
@@ -151,13 +139,15 @@ int main () {
             {
                 perror("Elapsed write");
             }
-            write(STDOUT_FILENO, "--------------------------", sizeof("--------------------------"));
+            write(STDOUT_FILENO, "--------------------------\n", sizeof("--------------------------\n"));
         }
 
         int p = fork();
         if (p == 0)
         {
             signal(SIGCHLD, child_terminated);
+            signal(SIGINT, terminalTermination);
+            signal(SIGTERM, sigterm_handler);
             int i = 0;
             int pid = -1;
             struct Processes process_list[100];
@@ -181,13 +171,36 @@ int main () {
                 write(STDOUT_FILENO, ip, ipc);
 				perror("reading stream message");
             }
-			
+
+			int killpid = waitpid(-1, NULL, WNOHANG);
+
+            if (killpid > 0)
+            {
+                for (int j = 0; j < size; j++)
+                {
+                    if (process_list[j].PID == killpid)
+                    {
+                        process_list[j].status = 0;
+                        process_list[j].end_time = time(NULL);
+                        process_list[j].elapsed_time = (int) process_list[j].end_time - process_list[j].start_time;
+                        break;
+                    }
+                }
+            }
+
+
 			if (rval == 0)
             {
                 write(STDOUT_FILENO, ip, ipc);
 				int retec = write(STDOUT_FILENO, "Ending connection\n", sizeof("Ending connection\n"));
+                for (int j = 0; j < size && process_list[j].status; j++)
+                {   
+                    kill(process_list[j].PID, SIGTERM);
+                    waitpid(-1, NULL, WNOHANG);
+                }
                 if (retec < 0)
                 {
+                    
                     perror("Ending connection write");
                 }
             }
@@ -198,9 +211,12 @@ int main () {
             for (int j = 0; j < size; j++)
             {
                 kill(process_list[j].PID, SIGTERM);
-                wait(NULL);
+                pid_t pid = waitpid(-1, NULL, WNOHANG);
             }
             
+            write(STDOUT_FILENO, ip, ipc);
+			int retec = write(STDOUT_FILENO, "Ending connection\n", sizeof("Ending connection\n"));
+            kill(getpid(), SIGTERM);
             exit(0);
 
             }
@@ -364,12 +380,13 @@ int main () {
                                 
                                 //kill(getppid(), SIGUSR2);
                                 //i++;
+                                //write(msgsock, "Executed Successfully\n", sizeof("Executed Successfully\n"));
 
                             }
 
                         }
                         else{
-                            
+                            //write(msgsock, "Executed Successfully\n", sizeof("Executed Successfully\n"));
                             //kill(getppid(), SIGUSR2);
                             //i++;
 
@@ -398,7 +415,7 @@ int main () {
             
                             if (process_list[j].status)
                             {
-                                int e = sprintf(buff1, "Elapsed Time: %d secs\n", (int) (time(NULL) - process_list[j].start_time));
+                                int e = sprintf(buff1, "Elapsed Time: %d secs\n\n", (int) (time(NULL) - process_list[j].start_time));
                                 int elapsed = write(msgsock, buff1, e);
                                 if (elapsed < 0)
                                 {
@@ -406,9 +423,9 @@ int main () {
                                 }
                             }
                             else {
-                                int e = sprintf(buff1, "End Time: %s\n\n", asctime(localtime(&process_list[j].end_time)));
+                                int e = sprintf(buff1, "End Time: %s\n", asctime(localtime(&process_list[j].end_time)));
                                 write(msgsock, buff1, e);
-                                int f = sprintf(buff1, "Elapsed Time: %d secs\n", (int) (process_list[j].end_time - process_list[j].start_time));
+                                int f = sprintf(buff1, "Elapsed Time: %d secs\n\n", (int) (process_list[j].end_time - process_list[j].start_time));
                                 write(msgsock, buff1, f);
                             }
                         }
@@ -441,12 +458,22 @@ int main () {
 
                     for (int j = 0; j < size && process_list[j].PID != 0; j++)
                     {
+                        int q = write(STDOUT_FILENO, path, sizeof(path));
+                            if (q < 0)
+                            {
+                                perror("write path");
+                            }
 
                         if (process_list[j].status)
                         {
 
                             int prodID = atoi(path);
                             int prodID2 = (int) process_list[j].PID;
+                            int q = write(STDOUT_FILENO, path, sizeof(path));
+                            if (q < 0)
+                            {
+                                perror("write path");
+                            }
                             if (prodID == prodID2 || strcmp(process_list[j].Pname, path) == 0)
                             {
                                 int err = kill(process_list[j].PID, SIGTERM);
@@ -454,7 +481,10 @@ int main () {
                                     perror("kill");
                                 else{
                                     int killed = write(msgsock, "Killed\n", sizeof("Killed\n"));
-                                    if (killed > 0)
+                                    process_list[j].status = 0;
+                                    process_list[j].end_time = time(NULL);
+                                    process_list[j].elapsed_time = (int) process_list[j].end_time - process_list[j].start_time;
+                                    if (killed < 0)
                                     {
                                         perror("Killed write");
                                     }
@@ -506,9 +536,9 @@ int main () {
 				//printf("-->%s\n", command);
 		 }while (rval != 0);
         }
-		close(msgsock);
+		
 	} while (1);
-   
+   close(msgsock);
 
 
 
