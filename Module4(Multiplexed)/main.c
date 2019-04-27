@@ -398,10 +398,12 @@ int main () {
 
             }
            else if (strcmp(c, "list") == 0){
+			int bo = 0;
 
                     for (int j = 0; j < size; j++)
                     {
                         if (process_list[j].PID != 0){
+			    bo = 1;
                             char buff1[10000];
                             int a = sprintf(buff1, "Process ID: %d\n", process_list[j].PID);
                             write(msgsock, buff1, a);
@@ -433,6 +435,10 @@ int main () {
                             break;
                         }
                     }
+		if (bo == 0)
+		{
+			int cret = write(msgsock, "No processes in list\n", sizeof("No processes in list\n"));
+		}
 
             }
 
@@ -448,12 +454,13 @@ int main () {
                 }
                 else{
                     char path[1000] = "";
-                    while (c != NULL)
+                   /* while (c != NULL)
                     {
                         strcat(path, c);
                         strcat(path, " ");
                         c = strtok(NULL, " ");
                     }
+*/
                     int b = 0;
 
                     for (int j = 0; j < size && process_list[j].PID != 0; j++)
@@ -474,7 +481,7 @@ int main () {
                             {
                                 perror("write path");
                             }
-                            if (prodID == prodID2 || strcmp(process_list[j].Pname, path) == 0)
+                            if (prodID == prodID2 || strcmp(process_list[j].Pname, c) == 0)
                             {
                                 int err = kill(process_list[j].PID, SIGTERM);
                                 if (err < 0)
