@@ -57,7 +57,7 @@ int main(int argc, char *argv[])
 
 	fd_set readfds;
 	struct timeval timeout;
-	
+	char command[100];
 
 	while(1) {
 		
@@ -74,8 +74,9 @@ int main(int argc, char *argv[])
             perror("write");
             exit(-1);
         }
-        char command[100];
+        
         int ci = read(STDIN_FILENO, command, sizeof(command));
+	command[ci-1] = '\0';
 
         if (ci == -1)
         {
