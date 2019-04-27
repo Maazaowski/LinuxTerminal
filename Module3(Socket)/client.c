@@ -9,6 +9,7 @@
 #include <time.h>
 #include <errno.h>
 #include <signal.h>
+#include <sys/select.h>
 
 #define h_addr h_addr_list[0]
 
@@ -42,7 +43,7 @@ int main(int argc, char *argv[])
 	server.sin_family = AF_INET;
 	hp = gethostbyname(argv[1]);
 	if (hp == 0) {
-		printf("%d", hp);
+		//printf("%d", hp);
 		fprintf(stderr, "%s: unknown host\n", argv[1]);
 		exit(2);
 	}
@@ -53,8 +54,22 @@ int main(int argc, char *argv[])
 		perror("connecting stream socket");
 		exit(1);
 	}
+
+	fd_set readfds;
+	struct timeval timeout;
+	
+
 	while(1) {
+		FD_ZERO(&readfds);
+
+		FD_SET(sock, &readfds);
+
+		timeout.tv_sec = 1;
+		timeout.tv_usec = 5;
+		
+
         char cd[8] = "maaz:~$ ";
+		char output[1000];
         int a = write(STDOUT_FILENO, cd, sizeof(cd));
         if (a == -1)
         {
@@ -71,10 +86,28 @@ int main(int argc, char *argv[])
         }
 
         command[ci-1] = '\0';
+
 	  
 	if (write(sock, command, sizeof(command)) < 0)
 		perror("writing on stream socket");
 	//getchar();
+	int b;
+	
+	int ret = -1;
+	while (ret != 0)
+	{
+			ret = select(8, &readfds, NULL, NULL, &timeout);
+			if (ret != 0)
+			{
+				b = read(sock, output, sizeof(output));
+				//printf("b = %d", b);
+				int c = write(STDOUT_FILENO, output, b);
+				if (c < 0)
+				{
+					perror("writing output");
+				}
+			}
+	}
 	  
 	}
 	close(sock);
